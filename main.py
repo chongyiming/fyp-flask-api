@@ -5,8 +5,9 @@ import torch.nn.functional as F
 import numpy as np
 import os
 from scipy.signal import butter, filtfilt
-
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app, origins=["http://localhost:3000"])
 
 # ======== Model Definition ============
 class ECG_CNN_Combined(nn.Module):
@@ -113,4 +114,4 @@ def predict():
 
 # ========== Run App ====================
 if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=True)
+    app.run(debug=True)
