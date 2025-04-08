@@ -75,7 +75,7 @@ def load_ecg_data(file_path, num_leads=12, samples_per_lead=1000, fs=100):
 
 # ======== Load Model ==================
 model = ECG_CNN_Combined()
-model.load_state_dict(torch.load("ecg_cnn_combined.pth", map_location=torch.device("cpu")))
+model.load_state_dict(torch.load("ecg_cnn_combined_test.pth", map_location=torch.device("cpu")))
 model.eval()
 
 # ======== API Endpoint ================
@@ -105,7 +105,7 @@ def predict():
         else:
             mi_prob = round(confidence, 2)
             norm_prob = round(1 - confidence, 2)
-        return jsonify({'prediction': int(predicted), 'confidence': float(confidence),'norm_prob':norm_prob*100,'mi_prob':mi_prob*100})
+        return jsonify({'prediction': int(predicted), 'confidence': float(confidence),'norm_prob':int(norm_prob*100),'mi_prob':int(mi_prob*100)})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
