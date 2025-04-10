@@ -90,6 +90,7 @@ def predict():
 
     try:
         ecg_data = load_ecg_data(file_path)  # (12, 1000)
+        print(ecg_data)
         input_tensor = torch.tensor(ecg_data, dtype=torch.float32).unsqueeze(0)
 
         with torch.no_grad():
@@ -105,7 +106,7 @@ def predict():
         else:
             mi_prob = round(confidence, 2)
             norm_prob = round(1 - confidence, 2)
-        return jsonify({'prediction': int(predicted), 'confidence': float(confidence),'norm_prob':int(norm_prob*100),'mi_prob':int(mi_prob*100)})
+        return jsonify({'prediction': int(predicted), 'confidence': float(confidence),'norm_prob':int(norm_prob*100),'mi_prob':int(mi_prob*100),'ecg_data':ecg_data.tolist()})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
