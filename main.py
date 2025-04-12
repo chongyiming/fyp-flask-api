@@ -10,39 +10,46 @@ app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000"])
 
 # ======== Model Definition ============
-class ECG_CNN_Combined(nn.Module):
+class ECG_CNN_1D(nn.Module):
     def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv1d(12, 32, kernel_size=5, padding=2)
-        self.bn1 = nn.BatchNorm1d(32)
-        self.pool1 = nn.MaxPool1d(kernel_size=2)
+        super(ECG_CNN_1D, self).__init__()
+        # First Conv1d block: process raw ECG (shape: [batch, 12, 1000])
+        # 12 channels → 32 feature maps; kernel size 5 with padding=2 retains temporal dimension.
+        self.conv1 = nn.Conv1d(in_channels=12, out_channels=32, kernel_size=5, padding=2)
+        self.bn1   = nn.BatchNorm1d(32)
+        self.pool1 = nn.MaxPool1d(kernel_size=2)  # Downsample: 1000 → 500
 
-        self.conv2 = nn.Conv2d(1, 64, kernel_size=(3, 3), padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.pool2 = nn.MaxPool2d(kernel_size=(2, 2))
+        # Second Conv1d block: 32 → 64 feature maps; kernel size 3, padding=1 (output same length)
+        self.conv2 = nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        self.bn2   = nn.BatchNorm1d(64)
+        self.pool2 = nn.MaxPool1d(kernel_size=2)  # Downsample: 500 → 250
 
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=(3, 3), padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.pool3 = nn.MaxPool2d(kernel_size=(2, 2))
+        # Third Conv1d block: 64 → 128 feature maps; kernel size 3, padding=1
+        self.conv3 = nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
+        self.bn3   = nn.BatchNorm1d(128)
+        self.pool3 = nn.MaxPool1d(kernel_size=2)  # Downsample: 250 → 125
 
-        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        # Global average pooling over the time dimension
+        self.global_pool = nn.AdaptiveAvgPool1d(1)  # Collapse (batch, 128, 125) → (batch, 128, 1)
+
+        # Fully connected classifier
         self.fc1 = nn.Linear(128, 128)
         self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(128, 2)
+        self.fc2 = nn.Linear(128, 2)  # 2 output classes (e.g., "NORM" and "MI")
 
     def forward(self, x):
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = self.pool1(x)
-        x = x.unsqueeze(1)
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = self.pool2(x)
-        x = F.relu(self.bn3(self.conv3(x)))
-        x = self.pool3(x)
-        x = self.global_avg_pool(x)
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
+        # Input x shape: (batch, 12, 1000)
+        x = F.relu(self.bn1(self.conv1(x)))   # -> (batch, 32, 1000)
+        x = self.pool1(x)                     # -> (batch, 32, 500)
+        x = F.relu(self.bn2(self.conv2(x)))   # -> (batch, 64, 500)
+        x = self.pool2(x)                     # -> (batch, 64, 250)
+        x = F.relu(self.bn3(self.conv3(x)))   # -> (batch, 128, 250)
+        x = self.pool3(x)                     # -> (batch, 128, 125)
+        x = self.global_pool(x)               # -> (batch, 128, 1)
+        x = x.view(x.size(0), -1)             # Flatten to (batch, 128)
+        x = F.relu(self.fc1(x))               # -> (batch, 128)
         x = self.dropout(x)
-        x = self.fc2(x)
+        x = self.fc2(x)                       # -> (batch, 2)
         return x
 
 # ======== Filters =====================
@@ -74,8 +81,8 @@ def load_ecg_data(file_path, num_leads=12, samples_per_lead=1000, fs=100):
     return filtered_leads
 
 # ======== Load Model ==================
-model = ECG_CNN_Combined()
-model.load_state_dict(torch.load("ecg_cnn_combined_test.pth", map_location=torch.device("cpu")))
+model = ECG_CNN_1D()
+model.load_state_dict(torch.load("ecg_cnn_1d_3layers.pth", map_location=torch.device("cpu")))
 model.eval()
 
 # ======== API Endpoint ================
